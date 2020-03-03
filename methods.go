@@ -6,16 +6,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// MethodFn method函数类型
-type MethodFn func(map[string]interface{}) (map[string]interface{}, error)
+// Method 一个兼容HTTP和WebSocket的注册器
+type Method struct {
+	Events map[string]interface{}
+}
 
-// Methods 所有方法集合
-var Methods map[string]MethodFn
-
-// MethodRegisterHTTPAndSocket 注册Http及Socket
-func MethodRegisterHTTPAndSocket(app *gin.Engine) {
-	app.POST("/methods", func(ctx *gin.Context) {
+// InitHTTPAndSocket 注册Http及Socket
+//
+// 在gin项目初始化之后，注册Method，这样会以 baseURL 注册一个路由，并且分发方法至 HTTP 和 WebSocket
+//
+// 使用方法：
+//		held.MethodRegisterHTTPAndSocket(app, "/methods")
+func (method *Method) InitHTTPAndSocket(app *gin.Engine, baseURL string) {
+	method.Events = map[string]interface{}{}
+	app.POST(baseURL, func(ctx *gin.Context) {
 		body, err := GinBody(ctx)
+		println(body)
 		if err != nil {
 			ctx.JSON(500, gin.H{"error": "json format error"})
 			return
@@ -26,7 +32,7 @@ func MethodRegisterHTTPAndSocket(app *gin.Engine) {
 			return
 		}
 		url := body["url"].(string)
-		method := Methods[url]
+		method := method.Events[url].(func(map[string]interface{}) (interface{}, error))
 		data := body["data"].(map[string]interface{})
 
 		if method == nil {
@@ -45,7 +51,7 @@ func MethodRegisterHTTPAndSocket(app *gin.Engine) {
 	})
 }
 
-// AddMethod 注册一个method
-func AddMethod(method string, fn MethodFn) {
-	Methods[method] = fn
+// Add 注册一个method
+func (method *Method) Add(url string, fn func(map[string]interface{}) (interface{}, error)) {
+	method.Events[url] = fn
 }
